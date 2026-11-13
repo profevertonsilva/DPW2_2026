@@ -1,0 +1,509 @@
+# AgendAki - documentação executável da API
+#
+# Como usar: extensão "REST Client" do VS Code (humao.rest-client) ou o
+# cliente HTTP do IntelliJ/PhpStorm. Clique em "Send Request" acima de cada
+# requisição. Os tokens são capturados das respostas de login (# @name).
+#
+# Pré-requisitos: API rodando (cd api; php artisan serve) e dados de
+# demonstração carregados (php artisan migrate:fresh --seed).
+# Credenciais de uso exclusivamente local (README): senha Agendaki@2026.
+#
+# Convenções
+# - Autenticação: cabeçalho "Authorization: Bearer <token>" (Laravel Sanctum).
+# - Datas: ISO 8601 com deslocamento (-03:00), além de "data" (dd/MM/yyyy)
+#   e "hora_inicio"/"hora_fim" (HH:mm) prontas para exibir.
+# - Erros: 401 não autenticado, 403 sem permissão, 404 não encontrado ou de
+#   outra barbearia, 422 validação (formato padrão do Laravel, em português),
+#   409 horário ocupado, com até quatro horários alternativos:
+#   { "message": "Este horário acabou de ser preenchido.",
+#     "alternativas": ["2026-11-20T14:00:00-03:00", ...] }
+#
+# Ids usados nos exemplos (dados do seeder): barbearia 1 = Barbearia Central,
+# serviço 1 = Corte de cabelo, vínculo 2 = Rafael Souza. Ajuste @data para
+# uma data futura em que a barbearia esteja aberta.
+
+@base = http://localhost:8000/api
+@data = 2026-11-20
+@barbearia = 1
+@servico = 1
+@vinculo = 2
+
+###############################################################################
+# Públicas
+###############################################################################
+
+### Prova de vida: API e conexão com o PostgreSQL
+GET {{base}}/health
+Accept: application/json
+
+### Cadastro de usuário (RF #04): cria login e cliente e devolve o token. 201
+# Senha: mínimo de 8 caracteres, com pelo menos um caractere especial.
+POST {{base}}/auth/cadastro
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nome": "Nova Pessoa",
+  "email": "nova.pessoa@agendaki.test",
+  "telefone": "(19) 99999-0000",
+  "senha": "Senha@123",
+  "dispositivo": "api.http"
+}
+
+### Login do cliente de teste (RF #05). 200, ou 422 "E-mail ou senha inválidos."
+# @name loginCliente
+POST {{base}}/auth/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "cliente@agendaki.test",
+  "senha": "Agendaki@2026"
+}
+
+### Login do proprietário da Barbearia Central
+# @name loginDono
+POST {{base}}/auth/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "dono.central@agendaki.test",
+  "senha": "Agendaki@2026"
+}
+
+### Login de um barbeiro da Barbearia Central
+# @name loginBarbeiro
+POST {{base}}/auth/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "rafael@agendaki.test",
+  "senha": "Agendaki@2026"
+}
+
+### Esqueci minha senha (RF #06): envia um código de 6 dígitos (válido por 30 min).
+# Resposta sempre igual. Em desenvolvimento, o e-mail com o código está em
+# backend/storage/logs/laravel.log (procure "Seu código:").
+POST {{base}}/auth/esqueci-senha
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "cliente@agendaki.test"
+}
+
+### Redefinir a senha com o código recebido. Encerra as sessões abertas
+POST {{base}}/auth/redefinir-senha
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "cliente@agendaki.test",
+  "codigo": "123456",
+  "senha": "Agendaki@2026"
+}
+
+@tokenCliente = {{loginCliente.response.body.token}}
+@tokenDono = {{loginDono.response.body.token}}
+@tokenBarbeiro = {{loginBarbeiro.response.body.token}}
+
+### Busca de barbearias por nome e/ou cidade (RF #17, simplificado)
+GET {{base}}/barbearias?busca=central&cidade=são joão
+Accept: application/json
+
+### Página da barbearia (RF #15): dados, horário, serviços ativos e barbeiros
+# Cada barbeiro traz "servico_ids" com os serviços que executa.
+GET {{base}}/barbearias/{{barbearia}}
+Accept: application/json
+
+### Horários disponíveis de um barbeiro para um serviço e uma data (RF #19)
+# Resposta: { "data": "...", "horarios": [{ "inicio": ISO, "hora": "HH:mm" }] }
+GET {{base}}/barbearias/{{barbearia}}/disponibilidade?servico_id={{servico}}&vinculo_id={{vinculo}}&data={{data}}
+Accept: application/json
+
+### Avaliações da barbearia (RF #30): média, total e as últimas 50 visíveis
+GET {{base}}/barbearias/{{barbearia}}/avaliacoes
+Accept: application/json
+
+###############################################################################
+# Autenticadas
+###############################################################################
+
+### Dados do usuário e barbearias em que tem vínculo, com o papel
+GET {{base}}/me
+Accept: application/json
+Authorization: Bearer {{tokenCliente}}
+
+### Editar perfil (RF #07): nome e telefone (atualiza cliente e profissional)
+PUT {{base}}/me
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenCliente}}
+
+{
+  "nome": "Lucas Pereira",
+  "telefone": "(19) 99800-0001"
+}
+
+### Logout (RF #08): revoga apenas o token atual
+POST {{base}}/auth/logout
+Accept: application/json
+Authorization: Bearer {{tokenCliente}}
+
+###############################################################################
+# Cliente: agendamentos
+###############################################################################
+
+### Criar agendamento (RF #18). 201; 409 se o horário estiver ocupado;
+# 422 se o início estiver no passado ou fora do expediente do barbeiro.
+# @name novoAgendamento
+POST {{base}}/agendamentos
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenCliente}}
+
+{
+  "servico_id": {{servico}},
+  "vinculo_id": {{vinculo}},
+  "inicio": "{{data}}T10:00:00-03:00"
+}
+
+@agendamento = {{novoAgendamento.response.body.id}}
+
+### Repetir o mesmo pedido: 409 com horários alternativos (RF #36)
+POST {{base}}/agendamentos
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenCliente}}
+
+{
+  "servico_id": {{servico}},
+  "vinculo_id": {{vinculo}},
+  "inicio": "{{data}}T10:00:00-03:00"
+}
+
+### Meus agendamentos: próximos (RF #33)
+GET {{base}}/agendamentos?periodo=proximos
+Accept: application/json
+Authorization: Bearer {{tokenCliente}}
+
+### Meus agendamentos: histórico (passados, realizados e cancelados)
+GET {{base}}/agendamentos?periodo=historico
+Accept: application/json
+Authorization: Bearer {{tokenCliente}}
+
+### Detalhe de um agendamento próprio (403 se for de outro cliente)
+GET {{base}}/agendamentos/{{agendamento}}
+Accept: application/json
+Authorization: Bearer {{tokenCliente}}
+
+### Grade para remarcar: mesmo barbeiro e duração, ignorando o próprio horário
+GET {{base}}/agendamentos/{{agendamento}}/disponibilidade?data={{data}}
+Accept: application/json
+Authorization: Bearer {{tokenCliente}}
+
+### Remarcar (RF #21): mantém serviço, barbeiro e valor. 409 se ocupado
+POST {{base}}/agendamentos/{{agendamento}}/remarcar
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenCliente}}
+
+{
+  "inicio": "{{data}}T15:00:00-03:00"
+}
+
+### Cancelar (RF #21): só agendamentos futuros com status "agendado"
+POST {{base}}/agendamentos/{{agendamento}}/cancelar
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenCliente}}
+
+{
+  "motivo": "Não vou conseguir ir."
+}
+
+### Avaliar um atendimento realizado (RF #30): cria ou edita em até 7 dias. Nota de 1 a 5
+# Use o id de um atendimento "realizado" do histórico (periodo=historico).
+PUT {{base}}/agendamentos/1/avaliacao
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenCliente}}
+
+{
+  "nota": 5,
+  "comentario": "Atendimento impecável."
+}
+
+###############################################################################
+# Painel da barbearia (prefixo /painel/estabelecimentos)
+# Quem não tem vínculo ativo com a barbearia recebe 404 (isolamento, RF #37).
+# Rotas de gestão exigem papel "proprietario"; o barbeiro recebe 403.
+###############################################################################
+
+### Barbearias do usuário, com o papel (para escolher a barbearia ativa)
+GET {{base}}/painel/estabelecimentos
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+### Cadastrar barbearia (RF #09): o usuário se torna proprietário. 201
+# "horarios" traz os sete dias (0 = domingo a 6 = sábado).
+POST {{base}}/painel/estabelecimentos
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenCliente}}
+
+{
+  "nome": "Barbearia do Lucas",
+  "descricao": "Atendimento com hora marcada.",
+  "telefone": "(19) 3600-0099",
+  "cep": "13870-000",
+  "estado": "SP",
+  "cidade": "São João da Boa Vista",
+  "bairro": "Centro",
+  "logradouro": "Rua das Flores",
+  "numero": 99,
+  "complemento": null,
+  "horarios": [
+    { "dia_semana": 0, "aberto": false },
+    { "dia_semana": 1, "aberto": true, "hora_abertura": "09:00", "hora_fechamento": "18:00" },
+    { "dia_semana": 2, "aberto": true, "hora_abertura": "09:00", "hora_fechamento": "18:00" },
+    { "dia_semana": 3, "aberto": true, "hora_abertura": "09:00", "hora_fechamento": "18:00" },
+    { "dia_semana": 4, "aberto": true, "hora_abertura": "09:00", "hora_fechamento": "18:00" },
+    { "dia_semana": 5, "aberto": true, "hora_abertura": "09:00", "hora_fechamento": "18:00" },
+    { "dia_semana": 6, "aberto": true, "hora_abertura": "08:00", "hora_fechamento": "13:00" }
+  ]
+}
+
+### Dados da barbearia no painel (proprietário ou barbeiro), com o papel
+GET {{base}}/painel/estabelecimentos/{{barbearia}}
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+### Editar barbearia (proprietário): mesmos campos do cadastro
+PUT {{base}}/painel/estabelecimentos/{{barbearia}}
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+{
+  "nome": "Barbearia Central",
+  "descricao": "Cortes clássicos e modernos no centro da cidade.",
+  "telefone": "(19) 3600-0001",
+  "cep": "13870-000",
+  "estado": "SP",
+  "cidade": "São João da Boa Vista",
+  "bairro": "Centro",
+  "logradouro": "Rua das Palmeiras",
+  "numero": 120,
+  "horarios": [
+    { "dia_semana": 0, "aberto": true, "hora_abertura": "09:00", "hora_fechamento": "13:00" },
+    { "dia_semana": 1, "aberto": true, "hora_abertura": "09:00", "hora_fechamento": "19:00" },
+    { "dia_semana": 2, "aberto": true, "hora_abertura": "09:00", "hora_fechamento": "19:00" },
+    { "dia_semana": 3, "aberto": true, "hora_abertura": "09:00", "hora_fechamento": "19:00" },
+    { "dia_semana": 4, "aberto": true, "hora_abertura": "09:00", "hora_fechamento": "19:00" },
+    { "dia_semana": 5, "aberto": true, "hora_abertura": "09:00", "hora_fechamento": "19:00" },
+    { "dia_semana": 6, "aberto": true, "hora_abertura": "08:00", "hora_fechamento": "17:00" }
+  ]
+}
+
+### Serviços: listar (ativos e inativos)
+GET {{base}}/painel/estabelecimentos/{{barbearia}}/servicos
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+### Serviços: cadastrar (RF #10). Preço > 0 e duração em minutos > 0. 201
+# @name novoServico
+POST {{base}}/painel/estabelecimentos/{{barbearia}}/servicos
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+{
+  "nome": "Hidratação",
+  "descricao": "Hidratação capilar.",
+  "preco": 35.00,
+  "duracao_minutos": 30
+}
+
+@novoServicoId = {{novoServico.response.body.id}}
+
+### Serviços: editar ("status": "a" reativa um serviço inativo)
+PUT {{base}}/painel/estabelecimentos/{{barbearia}}/servicos/{{novoServicoId}}
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+{
+  "nome": "Hidratação",
+  "descricao": "Hidratação capilar com toalha quente.",
+  "preco": 38.00,
+  "duracao_minutos": 30
+}
+
+### Serviços: "excluir" = inativar (sai do app, continua no histórico)
+DELETE {{base}}/painel/estabelecimentos/{{barbearia}}/servicos/{{novoServicoId}}
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+### Barbeiro tentando cadastrar serviço: 403
+POST {{base}}/painel/estabelecimentos/{{barbearia}}/servicos
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenBarbeiro}}
+
+{
+  "nome": "Não deve passar",
+  "preco": 10,
+  "duracao_minutos": 30
+}
+
+### Equipe: listar, com serviços e jornada de cada um
+GET {{base}}/painel/estabelecimentos/{{barbearia}}/equipe
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+### Equipe: adicionar colaborador pelo e-mail de quem já tem conta (RF #11). 201
+# "papel" opcional: profissional (padrão), atendente ou gerente (gerente só pelo proprietário).
+# E-mail sem conta: 422 orientando o cadastro. Já vinculado: 422.
+# @name novoBarbeiro
+POST {{base}}/painel/estabelecimentos/{{barbearia}}/equipe
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+{
+  "email": "marina@agendaki.test"
+}
+
+@novoVinculo = {{novoBarbeiro.response.body.vinculo_id}}
+
+### Equipe: alterar cargo (RF #12): profissional, atendente ou gerente.
+# Só o proprietário atribui ou mexe em gerente; o papel do proprietário não muda.
+PUT {{base}}/painel/estabelecimentos/{{barbearia}}/equipe/{{novoVinculo}}/papel
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+{
+  "papel": "atendente"
+}
+
+### Equipe: serviços que o barbeiro executa (RF #13). Pelo menos um
+PUT {{base}}/painel/estabelecimentos/{{barbearia}}/equipe/{{novoVinculo}}/servicos
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+{
+  "servico_ids": [1, 2]
+}
+
+### Equipe: jornada do barbeiro (RF #13). Mais de uma faixa por dia é permitida;
+# dia sem faixa é folga; lista vazia = segue o horário da barbearia.
+PUT {{base}}/painel/estabelecimentos/{{barbearia}}/equipe/{{novoVinculo}}/jornada
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+{
+  "faixas": [
+    { "dia_semana": 2, "hora_inicio": "09:00", "hora_fim": "12:00" },
+    { "dia_semana": 2, "hora_inicio": "13:00", "hora_fim": "18:00" },
+    { "dia_semana": 3, "hora_inicio": "09:00", "hora_fim": "18:00" }
+  ]
+}
+
+### Equipe: remover barbeiro (encerra o vínculo; o do proprietário não sai)
+DELETE {{base}}/painel/estabelecimentos/{{barbearia}}/equipe/{{novoVinculo}}
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+### Agenda do dia (RF #33). Proprietário vê todos e pode filtrar por vinculo_id
+GET {{base}}/painel/estabelecimentos/{{barbearia}}/agenda?data={{data}}
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+### Agenda do dia vista pelo barbeiro: sempre só a própria
+GET {{base}}/painel/estabelecimentos/{{barbearia}}/agenda?data={{data}}
+Accept: application/json
+Authorization: Bearer {{tokenBarbeiro}}
+
+### Detalhe de um agendamento no painel
+GET {{base}}/painel/estabelecimentos/{{barbearia}}/agendamentos/{{agendamento}}
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+### Marcar como realizado (RF #23, check-in manual): a partir do dia do atendimento
+POST {{base}}/painel/estabelecimentos/{{barbearia}}/agendamentos/{{agendamento}}/realizado
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+### Cancelar pelo painel (proprietário, ou o barbeiro do atendimento)
+POST {{base}}/painel/estabelecimentos/{{barbearia}}/agendamentos/{{agendamento}}/cancelar
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+{
+  "motivo": "Barbeiro indisponível."
+}
+
+### Agendamento manual (tela 33): buscar cliente (da barbearia por nome/telefone/e-mail; outros só pelo e-mail exato)
+GET {{base}}/painel/estabelecimentos/{{barbearia}}/clientes?busca=marina
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+### Agendamento manual: criar para cliente cadastrado. 201; 409 se ocupado (RF #36)
+POST {{base}}/painel/estabelecimentos/{{barbearia}}/agendamentos
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+{
+  "email_cliente": "marina@agendaki.test",
+  "servico_id": {{servico}},
+  "vinculo_id": {{vinculo}},
+  "inicio": "{{data}}T16:30:00-03:00"
+}
+
+### Bloqueios do dia (RF #14). O barbeiro vê só os próprios; ?ate= amplia o período
+GET {{base}}/painel/estabelecimentos/{{barbearia}}/bloqueios?de={{data}}
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+### Agendamentos que ficariam dentro de um bloqueio (aviso antes de confirmar)
+GET {{base}}/painel/estabelecimentos/{{barbearia}}/bloqueios/conflitos?vinculo_id={{vinculo}}&inicio={{data}}T09:00:00-03:00&fim={{data}}T12:00:00-03:00
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+### Criar bloqueio. 201 com o bloqueio e os "conflitos" (não cancelados automaticamente)
+# O barbeiro só bloqueia a própria agenda (vinculo_id de outro: 403).
+# @name novoBloqueio
+POST {{base}}/painel/estabelecimentos/{{barbearia}}/bloqueios
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{tokenBarbeiro}}
+
+{
+  "vinculo_id": {{vinculo}},
+  "inicio": "{{data}}T12:00:00-03:00",
+  "fim": "{{data}}T13:30:00-03:00",
+  "motivo": "Consulta médica"
+}
+
+### Remover bloqueio
+DELETE {{base}}/painel/estabelecimentos/{{barbearia}}/bloqueios/{{novoBloqueio.response.body.bloqueio.id}}
+Accept: application/json
+Authorization: Bearer {{tokenBarbeiro}}
+
+### Trilha de auditoria (RF #38): só o proprietário. Filtros: de, ate (AAAA-MM-DD), usuario_id
+GET {{base}}/painel/estabelecimentos/{{barbearia}}/auditoria?de=2026-11-01
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
+
+### Isolamento: o dono da Central acessando a Barbearia do Porto (id 2): 404
+GET {{base}}/painel/estabelecimentos/2/servicos
+Accept: application/json
+Authorization: Bearer {{tokenDono}}
