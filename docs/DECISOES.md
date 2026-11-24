@@ -67,7 +67,7 @@ O banco da turma (`docs/banco/AgendAki_PostgreSQL_turma.sql`) foi convertido em 
 
 ### 3.3 Campos sem definição da turma (seção 5.10 do briefing)
 
-Propostas aceitas pelo João, sem definição prévia da turma.
+Propostas aceitas pela equipe, sem definição prévia da turma.
 
 | Campo | Decisão |
 |---|---|
@@ -99,7 +99,7 @@ Tabelas `pacote`, `papel_plataforma` e `login_papel`; colunas `cliente.recorrenc
 | 4.10 | No MVP (Fases 1 a 3), serviços e equipe no painel eram exclusivos do proprietário, e o barbeiro acessava a barbearia, a própria agenda e os próprios atendimentos. Com o desejável 8, o gerente passou a ter a gestão e o atendente a agenda de todos (ver 4.18) | RF #03 |
 | 4.11 | Respostas JSON sem o envelope `data` dos API Resources; mensagens de erro e de validação em português (`lang/pt_BR/validation.php`, sem pacote extra) | Clientes mais simples; poucas dependências |
 | 4.12 | Datas gravadas com o deslocamento explícito (`$dateFormat = 'Y-m-d H:i:sP'` nos models) e instantes recebidos convertidos para `America/Sao_Paulo` | Um início enviado em UTC (`...Z`) é gravado como o mesmo instante, sem ser reinterpretado como horário local |
-| 4.13 | Não é possível remover da equipe um barbeiro com agendamentos futuros com status `agendado`: a API responde 422 com a lista desses agendamentos, e o dono precisa cancelá-los antes (decisão do João, 08/11/2026) | Por analogia ao RF #14, em que o bloqueio de horários não cancela automaticamente os agendamentos existentes: o cancelamento é sempre um ato explícito, e o cliente não fica com um agendamento órfão |
+| 4.13 | Não é possível remover da equipe um barbeiro com agendamentos futuros com status `agendado`: a API responde 422 com a lista desses agendamentos, e o dono precisa cancelá-los antes (decisão da equipe, 08/11/2026) | Por analogia ao RF #14, em que o bloqueio de horários não cancela automaticamente os agendamentos existentes: o cancelamento é sempre um ato explícito, e o cliente não fica com um agendamento órfão |
 | 4.14 | Recuperação de senha (RF #06) com **código de 6 dígitos** enviado por e-mail, válido por 30 minutos e de uso único, em vez de link. O código fica com hash em `password_reset_tokens`, perde a validade após 5 tentativas erradas, e a redefinição encerra todas as sessões (tokens). A resposta ao pedido é sempre a mesma, exista ou não a conta. Em desenvolvimento, o e-mail vai para `storage/logs/laravel.log` (driver `log`) | O app é nativo e não tem deep link: um link no e-mail não abriria a tela 11. Na demonstração, o e-mail só aparece no log do computador, e um código é fácil de digitar no emulador. Prazo de 30 minutos conforme o exemplo do RF #06 |
 | 4.15 | Agendamento manual pelo painel (tela 33) só para cliente com conta, identificado pelo e-mail; passa pela mesma proteção contra sobreposição do app. A busca de clientes mostra, por nome, telefone ou e-mail, só quem já tem cadastro na barbearia (`cliente_estabelecimento`); outras contas aparecem apenas pelo e-mail exato. Sem campo "Observações" e sem "Cliente sem cadastro". O barbeiro só agenda na própria agenda | O banco exige `login` para o cliente (INDICE, tela 33). A busca restrita evita expor clientes de outras barbearias (RF #37). `atendimento` não tem coluna de observações, e o briefing manda não inventar campos |
 | 4.16 | Trilha de auditoria (RF #38) com as operações do RF #38 que existem no escopo: cancelamento e remarcação de agendamento (pelo cliente ou pelo painel), alteração de cargo e remoção de colaborador, e alteração dos dados da barbearia (só os campos que mudaram). Caixa e cupom estão fora do escopo. Consulta só do proprietário, com filtro por período (padrão: últimos 30 dias) e por usuário | RF #38 |
@@ -127,7 +127,7 @@ As telas seguem `docs/prototipo/telas/INDICE.md`. Decisões de interface que val
 
 ## 6. Desejáveis cortados (Fase 4)
 
-Decisão do João (08/11/2026), registrada antes de iniciar os desejáveis da seção 4.2 do briefing.
+Decisão da equipe (08/11/2026), registrada antes de iniciar os desejáveis da seção 4.2 do briefing.
 
 | Item | Requisito | Motivo do corte |
 |---|---|---|
@@ -138,7 +138,7 @@ Decisão do João (08/11/2026), registrada antes de iniciar os desejáveis da se
 
 ## 7. Padrão visual da turma e landing page (v1.1)
 
-Decisão do João (10/11/2026). Só apresentação: API, banco e regras de negócio não mudaram.
+Decisão da equipe (10/11/2026). Só apresentação: API, banco e regras de negócio não mudaram.
 
 | # | Decisão | Motivo e referência |
 |---|---|---|
@@ -146,14 +146,14 @@ Decisão do João (10/11/2026). Só apresentação: API, banco e regras de negó
 | 7.2 | Os tokens ficam num só lugar em cada ponta: `@theme` do Tailwind em `frontend/src/index.css` e `temaAgendaki()` (ThemeData, Material 3) com as constantes em `mobile/lib/componentes.dart` | Um ponto único de manutenção |
 | 7.3 | Refinamentos sobre o padrão da turma (marca "AgendAki", sem itens de menu pendentes, grade da agenda pelo horário da barbearia, rótulo do bloqueio visível, estados de carregamento e erro uniformes, foco visível) | Inconsistências e problemas de uso encontrados no front da turma; lista completa no MAPEAMENTO, seção 4 |
 | 7.4 | Telas que só existem na turma (34 Check-in por QR Code, Clientes, Financeiro, Marketing, Relatórios, ambiente de testes) não foram implementadas | Fora do escopo do briefing (seção 4.3) ou desejável cortado (seção 6 deste documento) |
-| 7.5 | Landing page pública em `/` do `frontend/`, com "Acessar painel", hero, benefícios, "como funciona", prints e rodapé. O painel passou de `/` para `/painel` (login, criar conta e cadastro de barbearia continuam em `/login`, `/criar-conta` e `/barbearias/nova`) | Pedido do João para a v1.1 |
+| 7.5 | Landing page pública em `/` do `frontend/`, com "Acessar painel", hero, benefícios, "como funciona", prints e rodapé. O painel passou de `/` para `/painel` (login, criar conta e cadastro de barbearia continuam em `/login`, `/criar-conta` e `/barbearias/nova`) | Pedido da equipe para a v1.1 |
 | 7.6 | Os botões "Baixar no Google Play" e "Baixar na App Store" são fictícios: ícones genéricos, sem os selos oficiais, e abrem o aviso "Em breve" | O app não está publicado; os selos oficiais têm regras de uso das lojas |
 
 ---
 
 ## 8. Entrega no repositório da turma (pacotes por grupo)
 
-Decisão do João (10/11/2026). O código vai para o repositório da turma, `profevertonsilva/DPW2_2026`, em três commits feitos pelos líderes dos grupos Back-end, Front-end e Mobile. Eu só preparo os pacotes; nenhuma operação de escrita é feita no repositório da turma.
+Decisão da equipe (10/11/2026). O código vai para o repositório da turma, `profevertonsilva/DPW2_2026`, em três commits feitos pelos líderes dos grupos Back-end, Front-end e Mobile. Eu só preparo os pacotes; nenhuma operação de escrita é feita no repositório da turma.
 
 | # | Decisão | Motivo e referência |
 |---|---|---|
@@ -169,11 +169,11 @@ Decisão do João (10/11/2026). O código vai para o repositório da turma, `pro
 
 ## 9. Busca independente do locale do banco (v1.1.1)
 
-Decisão do João (10/11/2026), a partir do item 8.6.
+Decisão da equipe (10/11/2026), a partir do item 8.6.
 
 | # | Decisão | Motivo e referência |
 |---|---|---|
 | 9.1 | As buscas sem diferenciar maiúsculas (barbearias por nome e cidade; clientes no agendamento manual por nome, telefone e e-mail) comparam `lower(coluna COLLATE "und-x-icu")` com `lower(termo COLLATE "und-x-icu")`, em `App\Support\Busca`, no lugar do `ILIKE`. O resultado é o mesmo em banco com locale C, C.UTF-8 ou pt_BR.UTF-8. Acentos continuam diferenciados: "aguas" não encontra "Águas", como antes | O `ILIKE` converte maiúsculas pela collation da coluna, e com o locale C não converte letras acentuadas. A collation `und-x-icu` existe em qualquer PostgreSQL compilado com ICU, como o instalador oficial e os pacotes das distribuições Linux |
 | 9.2 | Teste `BuscaLocaleTest`: troca a collation das colunas buscadas para `"C"` dentro da transação do teste (o mesmo efeito de um banco criado com locale C) e confere a busca com acento e em maiúsculas, nas duas buscas, e que a busca sem acento continua sem achar o nome acentuado. A API passa a ter 127 testes | Os dois testes falhavam com o `ILIKE` e passam com a collation ICU |
 | 9.3 | O aviso de locale do item 8.6 deixa de ser necessário. O `README_AGENDAKI.md` do pacote passa a citar só o requisito de PostgreSQL com ICU | Substitui 8.6 |
-| 9.4 | O PDF da documentação que vai no pacote da turma é gerado com os nomes de pasta da turma (`backend/`, `frontend/`, `mobile/`); o deste repositório continua com `api/`, `web/` e `app/` | Pedido do João |
+| 9.4 | O PDF da documentação que vai no pacote da turma é gerado com os nomes de pasta da turma (`backend/`, `frontend/`, `mobile/`); o deste repositório continua com `api/`, `web/` e `app/` | Pedido da equipe |

@@ -164,7 +164,7 @@ class Barbearias
             throw ValidationException::withMessages(['vinculo' => 'Este barbeiro já foi removido da equipe.']);
         }
 
-        // Decisão do João (DECISOES 4.13, referência RF #14): a remoção não
+        // Decisão da equipe (DECISOES 4.13, referência RF #14): a remoção não
         // cancela agendamentos automaticamente; o dono cancela antes.
         $pendentes = $vinculo->atendimentos()
             ->where('status', Atendimento::AGENDADO)
